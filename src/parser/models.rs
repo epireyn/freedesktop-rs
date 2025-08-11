@@ -1,5 +1,7 @@
 use std::fmt::Display;
 
+use crate::error::Error;
+
 trait CanBeComment {
     fn is_blank(&self) -> bool;
     fn is_comment(&self) -> bool;
@@ -8,9 +10,21 @@ trait CanBeComment {
 pub trait EntrySet<E> {
     fn without_comments(&self) -> Vec<&E>;
     fn only_comments(&self) -> Vec<&CommentEntry>;
+
+    fn find(&self, key: &str) -> Option<&E>;
+
+    fn get(&self, key: &str) -> Result<&E, Error> {
+        self.find(key).ok_or(Error::NotFound(key.to_owned()))
+    }
+
+    fn find_mut(&mut self, key: &str) -> Option<&mut E>;
+
+    fn get_mut(&mut self, key: &str) -> Result<&mut E, Error> {
+        self.find_mut(key).ok_or(Error::NotFound(key.to_owned()))
+    }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Group {
     pub header: String,
     pub content: GroupContent,
@@ -18,15 +32,24 @@ pub struct Group {
 
 impl Display for Group {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[{}]\n", self.header)?;
+        writeln!(f, "[{}]", self.header)?;
 
         write_content(f, &self.content)
     }
 }
 
-impl EntrySet<Entry> for Group {
-    fn without_comments(&self) -> Vec<&Entry> {
-        self.content.iter().filter(|e| !e.is_comment()).collect()
+impl EntrySet<ContentEntry> for Group {
+    fn without_comments(&self) -> Vec<&ContentEntry> {
+        self.content
+            .iter()
+            .filter_map(|e| {
+                if let Entry::Content(content) = e {
+                    Some(content)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     fn only_comments(&self) -> Vec<&CommentEntry> {
@@ -41,11 +64,31 @@ impl EntrySet<Entry> for Group {
             })
             .collect()
     }
+
+    fn find(&self, key: &str) -> Option<&ContentEntry> {
+        self.content
+            .iter()
+            .filter_map(|i| match i {
+                Entry::Content(content_entry) => Some(content_entry),
+                Entry::Comment(_) => None,
+            })
+            .find(|e| e.key == key)
+    }
+
+    fn find_mut(&mut self, key: &str) -> Option<&mut ContentEntry> {
+        self.content
+            .iter_mut()
+            .filter_map(|i| match i {
+                Entry::Content(content_entry) => Some(content_entry),
+                Entry::Comment(_) => None,
+            })
+            .find(|e| e.key == key)
+    }
 }
 
 pub type GroupContent = Vec<Entry>;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Entry {
     Content(ContentEntry),
     Comment(CommentEntry),
@@ -89,7 +132,7 @@ impl CanBeComment for Entry {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TopLevelEntry {
     Group(Group),
     Comment(CommentEntry),
@@ -133,7 +176,7 @@ impl CanBeComment for TopLevelEntry {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum CommentEntry {
     Text(String),
     Blank(String),
@@ -142,10 +185,10 @@ pub enum CommentEntry {
 impl Display for CommentEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CommentEntry::Text(s) => write!(f, "# {}", s),
+            CommentEntry::Text(s) => write!(f, "# {s}"),
 
             // No line feed since it's in its content already
-            CommentEntry::Blank(s) => write!(f, "{}", s),
+            CommentEntry::Blank(s) => write!(f, "{s}"),
         }
     }
 }
@@ -159,7 +202,7 @@ impl CommentEntry {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ContentEntry {
     pub key: String,
     pub values: Vec<String>,
@@ -178,7 +221,7 @@ impl Display for ContentEntry {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Locale {
     pub lang: String,
     pub encoding: Option<String>,
@@ -194,20 +237,59 @@ impl Display for Locale {
         }
 
         if let Some(encoding) = &self.encoding {
-            write!(f, ".{}", encoding)?;
+            write!(f, ".{encoding}")?;
         }
 
         if let Some(modifier) = &self.modifier {
-            write!(f, "@{}", modifier)?;
+            write!(f, "@{modifier}")?;
         }
 
         Ok(())
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct DesktopFile {
     pub content: Vec<TopLevelEntry>,
+}
+
+impl EntrySet<Group> for DesktopFile {
+    fn without_comments(&self) -> Vec<&Group> {
+        self.content
+            .iter()
+            .filter_map(|tle| match tle {
+                TopLevelEntry::Group(group) => Some(group),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn only_comments(&self) -> Vec<&CommentEntry> {
+        self.content
+            .iter()
+            .filter_map(|tle| match tle {
+                TopLevelEntry::Comment(comment) => Some(comment),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn find(&self, header: &str) -> Option<&Group> {
+        self.without_comments()
+            .iter()
+            .find(|g| g.header == header)
+            .copied()
+    }
+
+    fn find_mut(&mut self, header: &str) -> Option<&mut Group> {
+        self.content
+            .iter_mut()
+            .filter_map(|i| match i {
+                TopLevelEntry::Group(group) => Some(group),
+                _ => None,
+            })
+            .find(|g| g.header == header)
+    }
 }
 
 impl Display for DesktopFile {
@@ -218,7 +300,7 @@ impl Display for DesktopFile {
 
 fn write_content<T: CanBeComment + Display>(
     f: &mut std::fmt::Formatter<'_>,
-    content: &Vec<T>,
+    content: &[T],
 ) -> std::fmt::Result {
     let mut peekable = content.iter().peekable();
     while let Some(item) = peekable.next() {
@@ -226,7 +308,7 @@ fn write_content<T: CanBeComment + Display>(
 
         // Add new line if it is a written entry before the end of iteration
         if peekable.peek().is_some() && !item.is_blank() {
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
     }
     Ok(())
