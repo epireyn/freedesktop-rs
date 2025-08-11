@@ -1,10 +1,12 @@
-use models::{CommentEntry, ContentEntry, DesktopFile, Entry, Group, GroupContent, TopLevelEntry};
+use models::{
+    CommentEntry, ContentEntry, DesktopFile, Entry, Group, GroupContent, Locale, TopLevelEntry,
+};
 use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, is_not, take_while},
-    character::complete::{char, line_ending, multispace1, space0},
+    character::complete::{alpha1, char, line_ending, multispace1, space0},
     combinator::{eof, map, map_res, opt, value},
-    error::Error,
+    error::{Error, ErrorKind},
     multi::{many0, many_till},
     sequence::{delimited, pair, preceded, terminated},
     AsChar, IResult, Parser,
@@ -148,21 +150,58 @@ fn parse_single_value(input: &[u8]) -> IResult<&[u8], String> {
     .parse(input)
 }
 
+fn parse_entry_locale(input: &[u8]) -> IResult<&[u8], Option<Locale>> {
+    let (main_input, locale_result) = opt(delimited(
+        char('['),
+        take_while(|c| c != b'[' && c != b']'),
+        char(']'),
+    ))
+    .parse(input)?;
+
+    if let Some(raw) = locale_result {
+        let modifier_parser = map_res(preceded(char('@'), alpha1), |r| str::from_utf8(r));
+        let encoding_parser = map_res(
+            preceded(
+                char('.'),
+                take_while(|b: u8| {
+                    let c = b.as_char();
+                    c.is_alphanumeric() || c == '-'
+                }),
+            ),
+            |r| str::from_utf8(r),
+        );
+        let country_parser = map_res(preceded(char('_'), alpha1), |r| str::from_utf8(r));
+        let mut lang_parser = map_res(alpha1, |r| str::from_utf8(r));
+
+        let (input, lang) = lang_parser.parse(raw)?;
+        let (input, country) = opt(country_parser).parse(input)?;
+        println!("{}", str::from_utf8(input).unwrap());
+        let (input, encoding) = opt(encoding_parser).parse(input)?;
+        let (input, modifier) = opt(modifier_parser).parse(input)?;
+        if !input.is_empty() {
+            return Err(nom::Err::Failure(Error {
+                input,
+                code: ErrorKind::NonEmpty,
+            }));
+        }
+        Ok((
+            main_input,
+            Some(Locale {
+                lang: lang.to_owned(),
+                country: country.map(ToOwned::to_owned),
+                encoding: encoding.map(ToOwned::to_owned),
+                modifier: modifier.map(ToOwned::to_owned),
+            }),
+        ))
+    } else {
+        Ok((main_input, None))
+    }
+}
+
 fn parse_content_entry(input: &[u8]) -> IResult<&[u8], ContentEntry> {
     let (input, key) = parse_key.parse(input)?;
-    let locale_result: IResult<&[u8], &str> = map_res(
-        delimited(char('['), take_while(|c| c != b'[' && c != b']'), char(']')),
-        |res| str::from_utf8(res),
-    )
-    .parse(input);
 
-    let locale = locale_result.ok();
-
-    let input = if let Some(input) = locale {
-        input.0
-    } else {
-        input
-    };
+    let (input, locale) = parse_entry_locale.parse(input)?;
 
     let (input, _) = (space0, char('='), space0).parse(input)?;
     let (input, values) = parse_value.parse(input)?;
@@ -171,7 +210,7 @@ fn parse_content_entry(input: &[u8]) -> IResult<&[u8], ContentEntry> {
         ContentEntry {
             key: key.to_owned(),
             values,
-            locale: locale.map(|tuple| tuple.1.to_owned()),
+            locale,
         },
     ))
 }
@@ -186,7 +225,7 @@ mod tests {
     #[test]
     fn test_parse_entry() {
         let simple_entry = "Hello=World\n";
-        let locale_entry = "Hello[locale]=World";
+        let locale_entry = "Hello[en_US.UTF-8]=World";
         let no_value = "Hello=";
         let comment = "# Comment\n";
         let empty = "\n";
@@ -210,7 +249,12 @@ mod tests {
                 Entry::Content(ContentEntry {
                     key: "Hello".to_owned(),
                     values: vec!["World".to_owned()],
-                    locale: Some("locale".to_owned())
+                    locale: Some(Locale {
+                        lang: String::from("en"),
+                        country: Some(String::from("US")),
+                        encoding: Some(String::from("UTF-8")),
+                        modifier: None,
+                    })
                 })
             ))
         );
