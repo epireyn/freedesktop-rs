@@ -1,4 +1,6 @@
 use std::ops::Deref;
+
+#[cfg(feature = "trash")]
 pub mod trash;
 
 pub struct AsciiString {
