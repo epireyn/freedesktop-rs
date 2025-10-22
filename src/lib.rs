@@ -9,7 +9,7 @@
 //! ```
 //!  use std::fs::{self};
 //!
-//!  use crate::parser::models::DesktopFile;
+//!  use freedesktop_rs::parser::models::DesktopFile;
 //!
 //!  fn parse_file(path: &str) -> Result<DesktopFile, nom::Err<nom::error::Error<Vec<u8>>>> {
 //!      let content: Vec<u8> = fs::read(path).expect("File could not be read");
