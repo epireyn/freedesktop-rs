@@ -1,7 +1,12 @@
 [package]
 name = "freedesktop-rs"
 version = "0.1.0"
+description = "A freedesktop parser and high level helper for Rust"
 edition = "2024"
+repository = "https://github.com/epireyn/freedesktop-rs"
+license-file = "LICENSE"
+keywords = ["parser", "freedesktop", "desktop-file"]
+exclude = [".github/", ".envrc", ".gitignore", "flake.*", "rust-analyzer.toml"]
 
 [features]
 trash = ["dep:time"]
