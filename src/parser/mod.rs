@@ -12,6 +12,7 @@ use nom::{
     AsChar, IResult, Parser,
 };
 
+/// Low level models
 pub mod models;
 
 impl TryFrom<&[u8]> for DesktopFile {

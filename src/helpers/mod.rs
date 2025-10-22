@@ -1,8 +1,10 @@
 use std::ops::Deref;
 
+/// Representation of a trash file.
 #[cfg(feature = "trash")]
 pub mod trash;
 
+/// Representation of an ASCII-valid string
 pub struct AsciiString {
     value: String,
 }

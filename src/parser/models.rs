@@ -2,31 +2,48 @@ use std::fmt::Display;
 
 use crate::error::Error;
 
-trait CanBeComment {
+/// Trait implemented by entries to dynamically check whether the entry is blank or a comment.
+pub trait CanBeComment {
+    /// Returns whether the entry is a blank line.
     fn is_blank(&self) -> bool;
+    /// Returns whether the entry is a comment.
     fn is_comment(&self) -> bool;
 }
 
+/// Trait implemented by entites that contain multiple entries (eg. [Group] and [TopLevelEntry]).
 pub trait EntrySet<E> {
+    /// Returns a vector of the entries that are not comments or blanks.
     fn without_comments(&self) -> Vec<&E>;
+
+    /// Returs a vector of the entries that are comments or blanks (no key-values entries).
     fn only_comments(&self) -> Vec<&CommentEntry>;
 
+    /// Find an entry by its key, or `None` if no entry with this key was found.
     fn find(&self, key: &str) -> Option<&E>;
 
+    /// Similar to [Self::find], but throws if the key is not found.
     fn get(&self, key: &str) -> Result<&E, Error> {
         self.find(key).ok_or(Error::NotFound(key.to_owned()))
     }
 
+    /// Find an entry by its key and returns it as a mutable reference, or `None` if no entry with this key was found.
     fn find_mut(&mut self, key: &str) -> Option<&mut E>;
 
+    /// Similar to [Self::find_mut], but throws if the key is not found.    
     fn get_mut(&mut self, key: &str) -> Result<&mut E, Error> {
         self.find_mut(key).ok_or(Error::NotFound(key.to_owned()))
     }
 }
 
+/// A group of entries.
+///
+/// This represents a section in a freedesktop file.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Group {
+    /// The section name.
     pub header: String,
+
+    /// The content of the section.
     pub content: GroupContent,
 }
 
@@ -86,11 +103,17 @@ impl EntrySet<ContentEntry> for Group {
     }
 }
 
+/// Content of a section.
+///
+/// This an alias for Vec<Entry>.
 pub type GroupContent = Vec<Entry>;
 
+/// An entry in the file
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Entry {
+    /// A key-values entry
     Content(ContentEntry),
+    /// A comment or blank line
     Comment(CommentEntry),
 }
 
@@ -132,9 +155,13 @@ impl CanBeComment for Entry {
     }
 }
 
+/// An entry at the root of the file.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TopLevelEntry {
+    /// A section as per the Freedesktop specification.
     Group(Group),
+
+    /// A comment or blank line.
     Comment(CommentEntry),
 }
 
@@ -176,9 +203,12 @@ impl CanBeComment for TopLevelEntry {
     }
 }
 
+/// A comment or a blank line.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum CommentEntry {
+    /// A textual comment. Contains the line content.
     Text(String),
+    /// A blank line. Containes a number of "\n" for each subsequent lines.
     Blank(String),
 }
 
@@ -202,10 +232,16 @@ impl CommentEntry {
     }
 }
 
+/// A key-values entry.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct ContentEntry {
+    /// The key of the entry.
     pub key: String,
+
+    /// The values of the entry.
     pub values: Vec<String>,
+
+    /// The potential locale of the entry.
     pub locale: Option<Locale>,
 }
 
@@ -221,11 +257,18 @@ impl Display for ContentEntry {
     }
 }
 
+/// A locale of an entry.
+///
+/// If given to an entry, the only required argument is the language. Everything else is optional.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Locale {
+    /// The language of the bound value.
     pub lang: String,
+    /// The encoding of the bound value.
     pub encoding: Option<String>,
+    /// The country variant of the language as per the specification.
     pub country: Option<String>,
+    /// Any other variant of the language as per the specification.
     pub modifier: Option<String>,
 }
 
@@ -248,8 +291,12 @@ impl Display for Locale {
     }
 }
 
+/// The representation of a Freedesktop file, which contains [TopLevelEntry].
+///
+/// This struct is used to parse raw data, see its implementations of [From<...>] for more information.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct DesktopFile {
+    /// The top-level entries of the file.
     pub content: Vec<TopLevelEntry>,
 }
 

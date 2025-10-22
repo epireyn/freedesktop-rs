@@ -7,10 +7,13 @@ const DATE_FORMAT: &[BorrowedFormatItem] =
 
 const GROUP_NAME: &str = "Trash Info";
 
+/// Representation of a freedesktop trash file.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TrashFile {
     desktop_file: DesktopFile,
+    /// Path of the trashed file.
     pub path: String,
+    /// Deletion date of the trashed file.
     pub deletion_date: PrimitiveDateTime,
 }
 
