@@ -1,8 +1,11 @@
 use std::ops::Deref;
 
+#[cfg_attr(docsrs, doc(cfg(feature = "trash")))]
 /// Representation of a trash file.
 #[cfg(feature = "trash")]
 pub mod trash;
+#[cfg(feature = "trash")]
+pub use trash::TrashFile;
 
 /// Representation of an ASCII-valid string
 pub struct AsciiString {

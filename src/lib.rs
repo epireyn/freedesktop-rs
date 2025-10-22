@@ -1,4 +1,5 @@
 #![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 //! This crate is a Rust parser of Desktop Entry files.
 //!
 //! It follows the specification found on [their website](https://specifications.freedesktop.org/desktop-entry-spec/1.1/)

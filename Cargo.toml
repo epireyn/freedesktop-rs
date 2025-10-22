@@ -1,10 +1,11 @@
 [package]
 name = "freedesktop-rs"
-version = "0.1.0"
+version = "0.1.1"
 description = "A freedesktop parser and high level helper for Rust"
 edition = "2024"
 repository = "https://github.com/epireyn/freedesktop-rs"
 license-file = "LICENSE"
+license = "MIT"
 keywords = ["parser", "freedesktop", "desktop-file"]
 exclude = [".github/", ".envrc", ".gitignore", "flake.*", "rust-analyzer.toml"]
 
@@ -14,3 +15,9 @@ trash = ["dep:time"]
 [dependencies]
 nom = "8.0.0"
 time = { version = "0.3.41", features = ["std", "formatting", "parsing", "macros" ], optional = true }
+
+# docs.rs-specific configuration
+[package.metadata.docs.rs]
+all-features = true
+# defines the configuration attribute `docsrs`
+rustdoc-args = ["--cfg", "docsrs"]

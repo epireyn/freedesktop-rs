@@ -7,6 +7,7 @@ const DATE_FORMAT: &[BorrowedFormatItem] =
 
 const GROUP_NAME: &str = "Trash Info";
 
+#[cfg_attr(docsrs, doc(cfg(feature = "trash")))]
 /// Representation of a freedesktop trash file.
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct TrashFile {
