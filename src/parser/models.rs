@@ -18,7 +18,7 @@ pub trait EntrySet<E> {
     /// Returs a vector of the entries that are comments or blanks (no key-values entries).
     fn only_comments(&self) -> Vec<&CommentEntry>;
 
-    /// Find an entry by its key, or `None` if no entry with this key was found.
+    /// Find the first entry for this key, or `None` if no entry with this key was found.
     fn find(&self, key: &str) -> Option<&E>;
 
     /// Similar to [Self::find], but throws if the key is not found.
@@ -26,12 +26,86 @@ pub trait EntrySet<E> {
         self.find(key).ok_or(Error::NotFound(key.to_owned()))
     }
 
-    /// Find an entry by its key and returns it as a mutable reference, or `None` if no entry with this key was found.
+    /// Find the first entry for this key and returns it as a mutable reference, or `None` if no entry with this key was found.
     fn find_mut(&mut self, key: &str) -> Option<&mut E>;
 
     /// Similar to [Self::find_mut], but throws if the key is not found.    
     fn get_mut(&mut self, key: &str) -> Result<&mut E, Error> {
         self.find_mut(key).ok_or(Error::NotFound(key.to_owned()))
+    }
+}
+
+/// Defines what options of a [Locale] are significant when searching for an entry.
+pub struct LocaleOptions<'a> {
+    /// A reference to the locale to be found.
+    pub locale: &'a Locale,
+    /// Whether the country is significant.
+    pub country: bool,
+    /// Whether the country is significant.
+    pub encoding: bool,
+    /// Whether the country is significant.
+    pub modifier: bool,
+}
+
+impl<'a> LocaleOptions<'a> {
+    /// Creates a new instance in which all options are insignificant (besides language).
+    pub fn new(locale: &'a Locale) -> Self {
+        Self {
+            locale,
+            country: false,
+            encoding: false,
+            modifier: false,
+        }
+    }
+    /// Creates a new instance in which all options are significant.
+    pub fn all(locale: &'a Locale) -> Self {
+        Self {
+            locale,
+            country: true,
+            encoding: true,
+            modifier: true,
+        }
+    }
+
+    /// Makes all options insignificant but the language.
+    pub fn language_only(self) -> Self {
+        Self {
+            locale: self.locale,
+            country: false,
+            encoding: false,
+            modifier: false,
+        }
+    }
+
+    /// Makes all options significant.
+    pub fn all_significant(self) -> Self {
+        self.significant_country()
+            .significant_encoding()
+            .significant_modifiers()
+    }
+
+    /// Makes the encoding significant.
+    pub fn significant_encoding(mut self) -> Self {
+        self.encoding = true;
+        self
+    }
+
+    /// Makes the country significant.
+    pub fn significant_country(mut self) -> Self {
+        self.country = true;
+        self
+    }
+
+    /// Makes the modifiers significant.
+    pub fn significant_modifiers(mut self) -> Self {
+        self.modifier = true;
+        self
+    }
+
+    /// Changes the locale.
+    pub fn with_locale(mut self, locale: &'a Locale) -> Self {
+        self.locale = locale;
+        self
     }
 }
 
@@ -100,6 +174,43 @@ impl EntrySet<ContentEntry> for Group {
                 Entry::Comment(_) => None,
             })
             .find(|e| e.key == key)
+    }
+}
+
+impl Group {
+    /// Find the first entry for this key and locale, or `None` if no entry with this key was found.
+    pub fn find_with_locale(&self, key: &str, options: &LocaleOptions) -> Option<&ContentEntry> {
+        self.content
+            .iter()
+            .filter_map(|i| match i {
+                Entry::Content(content_entry) => Some(content_entry),
+                Entry::Comment(_) => None,
+            })
+            .find(|e| {
+                e.key == key
+                    && e.locale
+                        .as_ref()
+                        .map_or(true, |locale| locale.equals_options(options))
+            })
+    }
+    /// Find the first entry for this key and locale and returns it as a mutable reference, or `None` if no entry with this key was found.
+    pub fn find_with_locale_mut(
+        &mut self,
+        key: &str,
+        options: &LocaleOptions,
+    ) -> Option<&mut ContentEntry> {
+        self.content
+            .iter_mut()
+            .filter_map(|i| match i {
+                Entry::Content(content_entry) => Some(content_entry),
+                Entry::Comment(_) => None,
+            })
+            .find(|e| {
+                e.key == key
+                    && e.locale
+                        .as_ref()
+                        .map_or(true, |locale| locale.equals_options(options))
+            })
     }
 }
 
@@ -269,7 +380,25 @@ pub struct Locale {
     /// The country variant of the language as per the specification.
     pub country: Option<String>,
     /// Any other variant of the language as per the specification.
-    pub modifier: Option<String>,
+    pub modifiers: Option<String>,
+}
+
+impl Locale {
+    /// Check whether this locale respects the options
+    pub fn equals_options(&self, options: &LocaleOptions) -> bool {
+        let rhs = options.locale;
+        let mut res = self.lang == rhs.lang;
+        if options.country {
+            res &= self.country == rhs.country;
+        }
+        if options.encoding {
+            res &= self.encoding == rhs.encoding;
+        }
+        if options.modifier {
+            res &= self.modifiers == rhs.modifiers;
+        }
+        res
+    }
 }
 
 impl Display for Locale {
@@ -283,7 +412,7 @@ impl Display for Locale {
             write!(f, ".{encoding}")?;
         }
 
-        if let Some(modifier) = &self.modifier {
+        if let Some(modifier) = &self.modifiers {
             write!(f, "@{modifier}")?;
         }
 
@@ -379,7 +508,7 @@ mod tests {
                 lang: String::from("en"),
                 encoding: None,
                 country: Some(String::from("US")),
-                modifier: Some(String::from("new")),
+                modifiers: Some(String::from("new")),
             }),
         });
 

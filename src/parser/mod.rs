@@ -191,7 +191,7 @@ fn parse_entry_locale(input: &[u8]) -> IResult<&[u8], Option<Locale>> {
                 lang: lang.to_owned(),
                 country: country.map(ToOwned::to_owned),
                 encoding: encoding.map(ToOwned::to_owned),
-                modifier: modifier.map(ToOwned::to_owned),
+                modifiers: modifier.map(ToOwned::to_owned),
             }),
         ))
     } else {
@@ -254,7 +254,7 @@ mod tests {
                         lang: String::from("en"),
                         country: Some(String::from("US")),
                         encoding: Some(String::from("UTF-8")),
-                        modifier: None,
+                        modifiers: None,
                     })
                 })
             ))
