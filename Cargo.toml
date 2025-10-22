@@ -4,7 +4,6 @@ version = "0.1.1"
 description = "A freedesktop parser and high level helper for Rust"
 edition = "2024"
 repository = "https://github.com/epireyn/freedesktop-rs"
-license-file = "LICENSE"
 license = "MIT"
 keywords = ["parser", "freedesktop", "desktop-file"]
 exclude = [".github/", ".envrc", ".gitignore", "flake.*", "rust-analyzer.toml"]
